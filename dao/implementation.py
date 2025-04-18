@@ -3,21 +3,55 @@ from dao.interface import Interface
 from tabulate import tabulate
 from datetime import datetime
 from entity.artwork import Artwork
+from entity.artist import Artist
 from entity.gallery import Gallery
+from entity.user import User
 from entity.userfavoriteartwork import UserFavoriteArtwork
 from exception.exceptions import (
     ArtworkNotFoundException,
     FavoriteNotFoundException,
     UserNotFoundException,
     GalleryNotAddedException,
-    GalleryNotFoundException
+    GalleryNotFoundException,
+    ArtistNotFoundException
 )
 
 class VirtualArtGalleryDAO(Interface):
     def __init__(self, conn):
         self.conn = conn
         self.cursor = conn.cursor()
-    def view_artworks(self):
+
+
+    def view_artworks(self, artist_id=None):
+        try:
+            if artist_id is not None:
+                # Fetch only the artworks by the specified artist
+                self.cursor.execute("SELECT * FROM artwork WHERE artistid = %s", (artist_id,))
+            else:
+                # Fetch all artworks (if no artist_id is provided)
+                self.cursor.execute("SELECT * FROM artwork")
+                
+            rows = self.cursor.fetchall()
+            if not rows:
+                raise ArtworkNotFoundException("No artworks found.")
+            
+            print("\n  Artworks:")
+            for row in rows:
+                print(f"Artwork ID: {row[0]}")
+                print(f"Title: {row[1]}")
+                print(f"Description: {row[2]}")
+                print(f"Creation Date: {row[3]}")
+                print(f"Medium: {row[4]}")
+                print(f"Image URL: {row[5]}")
+                print("-" * 30)  # Separator for better readability
+                
+        except pymysql.Error as e:
+            print(f"Database Error: {e}")
+        except ArtworkNotFoundException as e:
+            print(f"Error: {e}")
+
+
+    def view_artworks2(self):
         try:
             self.cursor.execute("SELECT * FROM artwork")
             rows = self.cursor.fetchall()
@@ -28,51 +62,142 @@ class VirtualArtGalleryDAO(Interface):
             for row in rows:
                 print(f"Artwork ID: {row[0]}")
                 print(f"Title: {row[1]}")
-                print(f"Medium: {row[2]}")
-                print(f"Artist ID: {row[3]}")
-                print(f"Year: {row[4]}")
+                print("-" * 30)  # Separator for better readability
+        except pymysql.Error as e:
+            print(f"Database Error: {e}")
+
+    
+    def view_artists(self):
+        try:
+            self.cursor.execute("SELECT * FROM artist")
+            rows = self.cursor.fetchall()
+            if not rows:
+                raise ArtistNotFoundException("No artists found.")
+            print()
+            print("\nArtists:")
+            for row in rows:
+                print(f"Artist ID: {row[0]}")
+                print(f"Name: {row[1]}")
+                print(f"Biography: {row[2]}")
+                print(f"Birth date: {row[3]}")
+                print(f"Nationality: {row[4]}")
+                print(f"Website: {row[5]}")
+                print(f"contactinformation: {row[6]}")
+                print("-" * 30)  # Separator for better readability
+        except pymysql.Error as e:
+            print(f"Database Error: {e}")
+
+    def view_artists2(self):
+        try:
+            self.cursor.execute("SELECT * FROM artist")
+            rows = self.cursor.fetchall()
+            if not rows:
+                raise ArtistNotFoundException("No artists found.")
+            print()
+            print("\nArtists:")
+            for row in rows:
+                print(f"Artist ID: {row[0]}")
+                print(f"Name: {row[1]}")
+                print("-" * 30)  # Separator for better readability
+        except pymysql.Error as e:
+            print(f"Database Error: {e}")
+            
+    def view_users2(self):
+        try:
+            self.cursor.execute("SELECT * FROM users")
+            rows = self.cursor.fetchall()
+            if not rows:
+                raise ArtistNotFoundException("No artists found.")
+            print()
+            print("\nUsers:")
+            for row in rows:
+                print(f"User ID: {row[0]}")
+                print(f"Name: {row[1]}")
                 print("-" * 30)  # Separator for better readability
         except pymysql.Error as e:
             print(f"Database Error: {e}")
 
 
-    def add_artwork(self, title, description, medium, image_url):
+    def view_users(self):
         try:
-            creation_date = datetime.now().strftime('%Y-%m-%d')  # current date in YYYY-MM-DD format
-            query = """
-                INSERT INTO artwork (Title, Description, CreationDate, Medium, ImageURL)
-                VALUES (%s, %s, %s, %s, %s)
-            """
-            self.cursor.execute(query, (title, description, creation_date, medium, image_url))
-            self.conn.commit()
+            self.cursor.execute("SELECT * FROM users")
+            rows = self.cursor.fetchall()
+            if not rows:
+                raise ArtistNotFoundException("No artists found.")
             print()
-            print("/n Artwork added successfully!")
+            print("\nUsers:")
+            for row in rows:
+                print(f"User ID         : {row[0]}")
+                print(f"Username        : {row[1]}")
+                print(f"Password        : {row[2]}")
+                print(f"Email           : {row[3]}")
+                print(f"First Name      : {row[4]}")
+                print(f"Last Name       : {row[5]}")
+                print(f"Date of Birth   : {row[6]}")
+                print(f"Profile Picture : {row[7]}")
+                print(f"Favorite Artwork: {row[8]}")
+                print("-" * 40)  # Separator for better readability
+        except pymysql.Error as e:
+            print(f"Database Error: {e}")
+
+
+
+    def add_artwork(self, artwork: Artwork, artist_id: int):
+
+        try:
+            creation_date = datetime.now().strftime('%Y-%m-%d')
+            artwork.set_creation_date(creation_date)
+
+            query = """
+                INSERT INTO artwork (Title, Description, CreationDate, Medium, ImageURL,ArtistId)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """
+            self.cursor.execute(query, (
+                artwork.get_title(),
+                artwork.get_description(),
+                artwork.get_creation_date(),
+                artwork.get_medium(),
+                artwork.get_image_url(),
+                artist_id
+            ))
+            self.conn.commit()
+
+            print(f"\n✅ Artwork added successfully! by {artist_id}")
 
             self.cursor.execute("SELECT * FROM artwork WHERE ArtworkID = LAST_INSERT_ID()")
             inserted_artwork = self.cursor.fetchone()
 
             if inserted_artwork:
-                artwork_id, title, description, creation_date, medium, image_url = inserted_artwork
-                print("\n--- Inserted Artwork ---")
-                print(f"Artwork ID    : {artwork_id}")
-                print(f"Title         : {title}")
-                print(f"Description   : {description}")
-                print(f"Creation Date : {creation_date}")
-                print(f"Medium        : {medium}")
-                print(f"Image URL     : {image_url}")
+                artwork.set_artwork_id(inserted_artwork[0])
+                artwork.set_title(inserted_artwork[1])
+                artwork.set_description(inserted_artwork[2])
+                artwork.set_creation_date(inserted_artwork[3])
+                artwork.set_medium(inserted_artwork[4])
+                artwork.set_image_url(inserted_artwork[5])
+
+                print("\n🎨 Inserted Artwork:")
                 print("-" * 40)
+                print(f"Artwork ID    : {artwork.get_artwork_id()}")
+                print(f"Title         : {artwork.get_title()}")
+                print(f"Description   : {artwork.get_description()}")
+                print(f"Creation Date : {artwork.get_creation_date()}")
+                print(f"Medium        : {artwork.get_medium()}")
+                print(f"Image URL     : {artwork.get_image_url()}")
+                print("-" * 40)
+
         except pymysql.Error as e:
-            print(f"Error Adding Artwork: {e}")
+            print(f"❌ Error Adding Artwork: {e}")
 
 
-    def update_artwork(self, artwork):
+    def update_artwork(self, artwork, artist_id):
         try:
             creation_date = datetime.now().strftime('%Y-%m-%d')
-
+            
+            # Update only if the artwork belongs to the artist
             query = """
                 UPDATE artwork 
-                SET Title=%s, Description=%s, CreationDate=%s, Medium=%s, ImageURL=%s 
-                WHERE ArtworkID=%s
+                SET Title = %s, Description = %s, CreationDate = %s, Medium = %s, ImageURL = %s 
+                WHERE ArtworkID = %s AND ArtistId = %s
             """
             self.cursor.execute(query, (
                 artwork.get_title(),
@@ -80,50 +205,69 @@ class VirtualArtGalleryDAO(Interface):
                 creation_date,
                 artwork.get_medium(),
                 artwork.get_image_url(),
-                artwork.get_artwork_id()
+                artwork.get_artwork_id(),
+                artist_id
             ))
             self.conn.commit()
 
             if self.cursor.rowcount == 0:
-                print("Artwork ID not found.")
-                return
-            print()
-            print("\nArtwork updated successfully!")
+                raise ArtworkNotFoundException(
+                    f"🎨 Artwork with ID {artwork.get_artwork_id()} not found or doesn't belong to artist ID {artist_id}."
+                )
+
+            print("\n✅ Artwork updated successfully!")
 
             # Display updated artwork
-            self.cursor.execute("SELECT * FROM artwork WHERE ArtworkID = %s", (artwork.get_artwork_id(),))
+            self.cursor.execute(
+                "SELECT * FROM artwork WHERE ArtworkID = %s AND ArtistId = %s",
+                (artwork.get_artwork_id(), artist_id)
+            )
             updated_artwork = self.cursor.fetchone()
 
             if updated_artwork:
-                artwork_id, title, description, creation_date, medium, image_url = updated_artwork
-                print("\n--- Updated Artwork ---")
-                print(f"Artwork ID    : {artwork_id}")
-                print(f"Title         : {title}")
-                print(f"Description   : {description}")
-                print(f"Creation Date : {creation_date}")
-                print(f"Medium        : {medium}")
-                print(f"Image URL     : {image_url}")
+                artwork_id, title, description, creation_date, medium, image_url, artist_id = updated_artwork
+                print("\n--- 🎨 Updated Artwork ---")
+                print(f"🆔 Artwork ID    : {artwork_id}")
+                print(f"🖌️  Title         : {title}")
+                print(f"📝 Description   : {description}")
+                print(f"📅 Creation Date : {creation_date}")
+                print(f"🎨 Medium        : {medium}")
+                print(f"🌐 Image URL     : {image_url}")
+                print(f"👨‍🎨 Artist ID    : {artist_id}")
                 print("-" * 40)
 
-        except pymysql.Error as e:
-            print(f"Error Updating Artwork: {e}")
+        except ArtworkNotFoundException as e:
+            print(f"❌ {e}")
 
-    def remove_artwork(self, identifier):
+        except pymysql.Error as e:
+            print(f"❌ Error Updating Artwork: {e}")
+
+
+    def remove_artwork(self, artwork_id, artist_id):
         try:
-            query = "DELETE FROM artwork WHERE ArtworkID = %s OR Title = %s"
-            self.cursor.execute(query, (identifier, str(identifier)))
+            # Step 1: Verify artist exists
+            self.cursor.execute("SELECT 1 FROM artist WHERE ArtistId = %s", (artist_id,))
+            if not self.cursor.fetchone():
+                raise ArtistNotFoundException(f"Artist with ID {artist_id} not found.")
+
+            # Step 2: Delete artwork only if it belongs to the artist
+            query = "DELETE FROM artwork WHERE ArtworkID = %s AND ArtistId = %s"
+            self.cursor.execute(query, (artwork_id, artist_id))
             self.conn.commit()
 
             if self.cursor.rowcount == 0:
-                raise ArtworkNotFoundException("Artwork not found.")
-            print()
-            print("✅ Artwork removed successfully!")
-            print("🚀 We're always evolving! Feel free to add your next masterpiece anytime.")
-            print("🎭 Visit us again for more artistic inspiration!")
+                raise ArtworkNotFoundException("Artwork not found or you are not authorized to delete it.")
+
+            print("\n✅ Your artwork was removed successfully!")
+
+        except ArtistNotFoundException as e:
+            print(f"❌ {e}")
+
+        except ArtworkNotFoundException as e:
+            print(f"❌ {e}")
 
         except pymysql.Error as e:
-            print(f"Error Removing Artwork: {e}")
-
+            print(f"❌ Error Removing Artwork: {e}")
 
     def get_artwork_by_id(self, artwork_id):
         try:
@@ -140,8 +284,8 @@ class VirtualArtGalleryDAO(Interface):
                 title=row[1],
                 description=row[2],
                 creation_date=row[3],
-                medium=row[3],
-                image_url=row[4]
+                medium=row[4],   # Fixed: was using creation_date (row[3]) again
+                image_url=row[5]
             )
 
             # Print details with separator
@@ -157,8 +301,14 @@ class VirtualArtGalleryDAO(Interface):
 
             return artwork
 
+        except ArtworkNotFoundException as e:
+            print(f"Error: {e}")
+            return None
+
         except pymysql.Error as e:
-            print(f"Error Fetching Artwork: {e}")
+            print(f"Database Error: {e}")
+            return None
+
 
 
     def search_artworks(self, keyword):
@@ -189,8 +339,12 @@ class VirtualArtGalleryDAO(Interface):
                 print(f"Image URL   : {artwork.get_image_url()}")
                 print("-" * 40)
 
+        except ArtworkNotFoundException as e:
+            print(f"⚠️  {e}")
+
         except pymysql.Error as e:
-            print(f"Error Searching Artworks: {e}")
+            print(f"❌ Database Error: {e}")
+
 
 
     def add_artwork_to_favorite(self, favorite: UserFavoriteArtwork):
@@ -246,7 +400,7 @@ class VirtualArtGalleryDAO(Interface):
         except pymysql.Error as e:
             print(f"❌ Error Removing from Favorites: {e}")
 
-    def get_user_favorite_artworks(self, user_id):
+    def get_user_favorite_artworks(self, user_fav_artwork):
         try:
             query = """
                 SELECT a.ArtworkID, a.Title, a.Description, a.CreationDate, a.Medium, a.ImageURL
@@ -254,7 +408,7 @@ class VirtualArtGalleryDAO(Interface):
                 JOIN user_favorite_artwork ufa ON a.ArtworkID = ufa.ArtworkID
                 WHERE ufa.UserID = %s
             """
-            self.cursor.execute(query, (user_id,))
+            self.cursor.execute(query, (user_fav_artwork.get_user_id(),))
             rows = self.cursor.fetchall()
 
             if not rows:
@@ -262,12 +416,12 @@ class VirtualArtGalleryDAO(Interface):
 
             print("\n🎨 User's Favorite Artworks:")
             for row in rows:
-                print(f"🆔 Artwork ID: {row[0]}")
-                print(f"🖌️ Title: {row[1]}")
-                print(f"📝 Description: {row[2]}")
-                print(f"📅 Created On: {row[3]}")
-                print(f"🎨 Medium: {row[4]}")
-                print(f"🖼️ Image URL: {row[5]}")
+                print(f"🆔 Artwork ID    : {row[0]}")
+                print(f"🖌️  Title         : {row[1]}")
+                print(f"📝 Description   : {row[2]}")
+                print(f"📅 Created On    : {row[3]}")
+                print(f"🎨 Medium        : {row[4]}")
+                print(f"🖼️  Image URL     : {row[5]}")
                 print("-" * 40)
 
         except FavoriteNotFoundException as e:
@@ -276,32 +430,151 @@ class VirtualArtGalleryDAO(Interface):
         except pymysql.Error as e:
             print(f"❌ Error Fetching Favorites: {e}")
 
-    def add_artist(self, name, biography, birth_date, nationality, website, contact_info):
+    def get_artwork_favorited_by_users(self, artwork_id):
+        try:
+            # Step 1: Check if the artwork exists
+            check_artwork_query = "SELECT 1 FROM artwork WHERE ArtworkID = %s"
+            self.cursor.execute(check_artwork_query, (artwork_id,))
+            if not self.cursor.fetchone():
+                raise ArtworkNotFoundException(f"Artwork with ID {artwork_id} not found.")
+
+            # Step 2: Fetch users who favorited the artwork
+            query = """
+                SELECT u.UserID, u.Username, u.Email
+                FROM users u
+                JOIN user_favorite_artwork ufa ON u.UserID = ufa.UserID
+                WHERE ufa.ArtworkID = %s
+            """
+            self.cursor.execute(query, (artwork_id,))
+            rows = self.cursor.fetchall()
+
+            if not rows:
+                raise FavoriteNotFoundException("No users have favorited this artwork.")
+
+            print("\n👥 Users Who Favorited This Artwork:")
+            for row in rows:
+                print(f"🆔 User ID   : {row[0]}")
+                print(f"👤 Username  : {row[1]}")
+                print(f"📧 Email     : {row[2]}")
+                print("-" * 40)
+
+        except ArtworkNotFoundException as e:
+            print(f"🚫 {e}")
+
+        except FavoriteNotFoundException as e:
+            print(f"⚠️ {e}")
+
+        except pymysql.Error as e:
+            print(f"❌ Error Fetching Users Who Favorited Artwork: {e}")
+
+
+
+    def add_artist(self, artist):
         try:
             query = """
-                INSERT INTO Artist (Name, Biography, BirthDate, Nationality, Website, ContactInformation)
+                INSERT INTO artist (Name, Biography, BirthDate, Nationality, Website, ContactInformation)
                 VALUES (%s, %s, %s, %s, %s, %s)
             """
-            self.cursor.execute(query, (name, biography, birth_date, nationality, website, contact_info))
+            self.cursor.execute(query, (
+                artist.get_name(),
+                artist.get_biography(),
+                artist.get_birth_date(),
+                artist.get_nationality(),
+                artist.get_website(),
+                artist.get_contact_info()
+            ))
             self.conn.commit()
 
             # Fetch the auto-generated ArtistID
             artist_id = self.cursor.lastrowid
+            artist.set_artist_id(artist_id)
 
-            print("\nArtist added successfully!")
-            print(f"Artist ID: {artist_id}")
-            print(f"Name: {name}")
-            print(f"Biography: {biography}")
-            print(f"Birth Date: {birth_date}")
-            print(f"Nationality: {nationality}")
-            print(f"Website: {website}")
-            print(f"Contact Information: {contact_info}")
+            print("\n✅ Artist added successfully!")
+            print(f"🎨 Artist ID         : {artist.get_artist_id()}")
+            print(f"👤 Name              : {artist.get_name()}")
+            print(f"📖 Biography         : {artist.get_biography()}")
+            print(f"🎂 Birth Date        : {artist.get_birth_date()}")
+            print(f"🌍 Nationality       : {artist.get_nationality()}")
+            print(f"🔗 Website           : {artist.get_website()}")
+            print(f"📞 Contact Info      : {artist.get_contact_info()}")
+
         except pymysql.Error as e:
-            print(f"Error Adding Artist: {e}")
+            print(f"❌ Error Adding Artist: {e}")
+
+            
+    def add_users(self, Username, Password, Email, FirstName, LastName, DateOfBirth,ProfilePicture):
+        try:
+            query = """
+                INSERT INTO users (Username, Password, Email, FirstName, LastName, DateOfBirth,ProfilePicture)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """
+            self.cursor.execute(query, (Username, Password, Email, FirstName, LastName, DateOfBirth,ProfilePicture))
+            self.conn.commit()
+
+            # Fetch the auto-generated UserID
+            user_id = self.cursor.lastrowid
+
+            print("\nUser added successfully!")
+            print(f"User ID: {user_id}")
+            print(f"Name: {Username}")
+        except pymysql.Error as e:
+            print(f"Error Adding User: {e}")
+
+
+    def get_user_by_id(self, user_id):
+        self.cursor.execute("SELECT * FROM users WHERE UserID = %s", (user_id,))
+        result = self.cursor.fetchone()
+        if result:
+            return User(
+                result[0],  # UserID
+                result[1],  # Username
+                result[2],  # Password
+                result[3],  # Email
+                result[4],  # FirstName
+                result[5],  # LastName
+                result[6],  # DateOfBirth
+                result[7],  # ProfilePicture
+                result[8] if len(result) > 8 else None  # FavoriteArtwork (optional)
+            )
+        return None
+    
+    def get_user_by_username(self, username):
+        query = "SELECT * FROM users WHERE Username = %s"
+        self.cursor.execute(query, (username,))
+        row = self.cursor.fetchone()
+        if row:
+            return User(*row)  # Adjust depending on your User class constructor
+        return None
+
+   
+    def get_artist_by_id(self, artist_id):
+        self.cursor.execute("SELECT * FROM artist WHERE ArtistID = %s", (artist_id,))
+        result = self.cursor.fetchone()
+        if result:
+            return Artist(
+                result[0],  # ArtistID
+                result[1],  # Name
+                result[2],  # Biography
+                result[3],  # BirthDate
+                result[4],  # Nationality
+                result[5],  # Website
+                result[6]   # ContactInformation
+            )
+        return None
+
 
     
     def add_gallery(self, gallery: Gallery):
         try:
+            # Check if Curator (Artist) exists
+            check_query = "SELECT * FROM artist WHERE ArtistID = %s"
+            self.cursor.execute(check_query, (gallery.get_curator(),))
+            result = self.cursor.fetchone()
+
+            if not result:
+                raise ArtistNotFoundException(f"❌ Curator with ID {gallery.get_curator()} not found.")
+
+            # Insert gallery if curator exists
             query = """
                 INSERT INTO gallery (Name, Description, Location, Curator, OpeningHours)
                 VALUES (%s, %s, %s, %s, %s)
@@ -326,9 +599,12 @@ class VirtualArtGalleryDAO(Interface):
             print(f"⏰ Opening Hours  : {gallery.get_opening_hours()}")
             print("=" * 40 + "\n")
 
+        except ArtistNotFoundException as e:
+            print(e)
+
         except pymysql.Error as e:
             raise GalleryNotAddedException(f"❌ Error Adding Gallery: {e}")
-        
+
     
     def update_gallery(self, gallery: Gallery):
         try:
@@ -336,6 +612,11 @@ class VirtualArtGalleryDAO(Interface):
             self.cursor.execute("SELECT 1 FROM gallery WHERE GalleryID = %s", (gallery.get_gallery_id(),))
             if not self.cursor.fetchone():
                 raise GalleryNotFoundException(f"Gallery with ID {gallery.get_gallery_id()} not found.")
+
+            # Check if the curator (artist) exists
+            self.cursor.execute("SELECT 1 FROM artist WHERE ArtistID = %s", (gallery.get_curator(),))
+            if not self.cursor.fetchone():
+                raise ArtistNotFoundException(f"Curator with ID {gallery.get_curator()} not found.")
 
             # Perform the update
             query = """
@@ -370,6 +651,8 @@ class VirtualArtGalleryDAO(Interface):
                 print("=" * 50)
 
         except GalleryNotFoundException as e:
+            print(f"🚫 {e}")
+        except ArtistNotFoundException as e:
             print(f"🚫 {e}")
         except pymysql.Error as e:
             print(f"❌ Database Error: {e}")
@@ -445,6 +728,36 @@ class VirtualArtGalleryDAO(Interface):
             print(f"🚫 {e}")
         except pymysql.Error as e:
             print(f"❌ Database Error: {e}")
+    def view_all_galleries2(self):
+        try:
+            query = "SELECT * FROM gallery"
+            self.cursor.execute(query)
+            results = self.cursor.fetchall()
+
+            if not results:
+                raise GalleryNotFoundException("No galleries found in the database.")
+
+            print("\n🖼️ All Galleries:")
+            print("=" * 60)
+
+            for result in results:
+                gallery = Gallery(
+                    result[0],  # GalleryID
+                    result[1],  # Name
+                    result[2],  # Description
+                    result[3],  # Location
+                    result[4],  # Curator
+                    result[5]   # OpeningHours
+                )
+
+                print(f"🏛️ Gallery ID     : {gallery.get_gallery_id()}")
+                print(f"📛 Name           : {gallery.get_name()}")
+                print("-" * 60)
+
+        except GalleryNotFoundException as e:
+            print(f"🚫 {e}")
+        except pymysql.Error as e:
+            print(f"❌ Database Error: {e}")
     
     def search_gallery_by_id(self, gallery_id):
         try:
@@ -501,28 +814,33 @@ class VirtualArtGalleryDAO(Interface):
             print(f"❌ Database Error while removing gallery: {e}")
     
 
-    def gallery_artist_impact_report(self):
+    def gallery_artist_impact_report(self, artist_id):
         try:
             query = """
                 SELECT ar.ArtistID, ar.Name, COUNT(g.GalleryID) AS TotalGalleriesCurated
                 FROM artist ar
                 LEFT JOIN gallery g ON ar.ArtistID = g.Curator
+                WHERE ar.ArtistID = %s
                 GROUP BY ar.ArtistID, ar.Name
-                ORDER BY TotalGalleriesCurated DESC
             """
-            self.cursor.execute(query)
-            rows = self.cursor.fetchall()
+            self.cursor.execute(query, (artist_id,))
+            row = self.cursor.fetchone()
 
             print("\n🎨 Gallery Artist Impact Report 🎨")
             print("-" * 40)
-            for row in rows:
+
+            if row:
                 print(f"Artist ID   : {row[0]}")
                 print(f"Name        : {row[1]}")
                 print(f"Galleries   : {row[2]}")
-                print("-" * 40)
+            else:
+                print("No data found for the logged-in artist.")
+
+            print("-" * 40)
 
         except pymysql.Error as e:
             print(f"❌ Error generating report: {e}")
+
 
   
   
@@ -623,3 +941,52 @@ class VirtualArtGalleryDAO(Interface):
             print(f"❌ Database error: {e}")
 
 
+    
+    def get_galleries_by_curator(self, artist_id: int):
+        try:
+            query = "SELECT GalleryID, Name, Description, Location, Curator, OpeningHours FROM gallery WHERE Curator = %s"
+            self.cursor.execute(query, (artist_id,))
+            rows = self.cursor.fetchall()
+
+            if not rows:
+                raise ArtistNotFoundException(f"No galleries found for Artist ID [{artist_id}].")
+
+            galleries = [Gallery(*row) for row in rows]
+
+            print(f"\n🖼 Galleries curated by Artist [{artist_id}]:")
+            for g in galleries:
+                print(f" - Gallery ID: {g.get_gallery_id()}, Name: {g.get_name()}")
+            print(f"\nTotal Galleries: {len(galleries)}")
+
+            return galleries
+
+        except ArtistNotFoundException as e:
+            print(e)
+            return []
+
+        except Exception as e:
+            print(f"Error fetching galleries: {e}")
+            return []
+
+    def get_curator_by_gallery(self, gallery_id: int):
+        try:
+            query = "SELECT Curator FROM gallery WHERE GalleryID = %s"
+            self.cursor.execute(query, (gallery_id,))
+            result = self.cursor.fetchone()
+
+            if not result:
+                raise GalleryNotFoundException(f"Gallery ID [{gallery_id}] not found.")
+
+            curator_id = result[0]
+            print(f"🎨 Gallery [{gallery_id}] is curated by Artist ID [{curator_id}].")
+            return curator_id
+
+        except GalleryNotFoundException as e:
+            print(e)
+            return None
+
+        except Exception as e:
+            print(f"Error fetching curator: {e}")
+            return None
+        
+    
